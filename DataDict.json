@@ -1,0 +1,14 @@
+{
+  "default_file": "/home/pi/python/laserpen/svgsamples/UV_4a11ec6dc03c210b49b146cce5fc634e_4_schematic.svg",
+  "long_wait": 1.0,
+  "pantilt_origin": [
+    45,
+    -45
+  ],
+  "pantilt_range": [
+    50,
+    45
+  ],
+  "pantilt_step": 1,
+  "short_wait": 0.2
+}
