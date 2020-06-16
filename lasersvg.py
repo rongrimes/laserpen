@@ -9,6 +9,9 @@ except ModuleNotFoundError:
     quit()
 
 class LoadSvg:
+    PWR_OFF = 0
+    PWR_MAX = 100
+
     def __init__(self, input_file):     
         try:
             obj = untangle.parse(input_file)
@@ -32,8 +35,8 @@ class LoadSvg:
         self._wprint("dimensions: ({}, {})".format(self.dimensions[0], self.dimensions[1]))
 
         # self.steps = Return this to the caller
-        # List of (pwr(bool), x(float,int), yfloat(float,int), fast(bool))
-#       self.steps=[(False,0,0,True)]
+        # List of (pwr(int), x(float,int), yfloat(float,int), fast(bool))
+#       self.steps=[(0,0,0,True)]
         self.steps=[]
         indent = 0
         self._get_items(obj.svg, indent)
@@ -79,8 +82,8 @@ class LoadSvg:
     def _get_lines(self, elem):
         for i, line in enumerate(elem): 
             self._wprint("{} line: {} {} {} {}".format(i, line["x1"], line["x2"], line["y1"], line["y2"]))
-            self.steps.append( (True, float(line["x1"]), float(line["x2"]), True) )
-            self.steps.append( (True, float(line["y1"]), float(line["y2"]), False) )
+            self.steps.append( (self.PWR_OFF, float(line["x1"]), float(line["x2"]), True) )
+            self.steps.append( (self.PWR_MAX, float(line["y1"]), float(line["y2"]), False) )
         self._wprint("")
 
     def _get_rects(self, elem):
@@ -91,11 +94,11 @@ class LoadSvg:
             r_y = float(rect["y"])
             r_wid = float(rect["width"])
             r_hgt = float(rect["height"])
-            self.steps.append( (True, r_x, r_y, True) )
-            self.steps.append( (True, r_x+r_wid, r_y, False) )
-            self.steps.append( (True, r_x+r_wid, r_y+r_hgt, False) )
-            self.steps.append( (True, r_x, r_y+r_hgt, False) )
-            self.steps.append( (True, r_x, r_y, False) )
+            self.steps.append( (self.PWR_OFF, r_x, r_y, True) )
+            self.steps.append( (self.PWR_MAX, r_x+r_wid, r_y, False) )
+            self.steps.append( (self.PWR_MAX, r_x+r_wid, r_y+r_hgt, False) )
+            self.steps.append( (self.PWR_MAX, r_x, r_y+r_hgt, False) )
+            self.steps.append( (self.PWR_MAX, r_x, r_y, False) )
         self._wprint("")
 
     def _get_texts(self, elem):

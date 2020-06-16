@@ -6,6 +6,9 @@ from lasersvg import LoadSvg
 
 #---------------------------------------------------------------
 class Image:
+    PWR_OFF = 0
+    PWR_MAX = 100
+
     def __init__(self):
         self.width  = 0
         self.height = 0
@@ -16,20 +19,18 @@ class Image:
 
     def box_100(self, laserpen):
         self.dimensions = (100, 100)
-        self.steps = []
-        for pwr,x,y,speed in [(False, 0,0,True), (True, 100,0,False), \
-                (True, 100,100,True), (True, 0,100,False), (True, 0,0,True)]:
-            self.steps.append((pwr, x, y, speed))
+        pwr = self.PWR_MAX
+        self.steps = [(self.PWR_OFF, 0,0,True), (pwr, 100,0,False), \
+                (pwr, 100,100,True), (pwr, 0,100,False), (pwr, 0,0,True)]
         laserpen.render_image(self)
 
     def draw_quickbox(self, app, laserpen):
-        '''Draws the outer frame of the drwaing yo facilitate post drawing stretching.
+        '''Draws the outer frame of the drawing to facilitate post drawing stretching.
         '''
         self.dimensions = (100, 100)
-        self.steps = []
-        for pwr,x,y,speed in [(False, 0,0,True), (True, 100,0,True), \
-                (True, 100,100,True), (True, 0,100,True), (True, 0,0,True)]:
-            self.steps.append((pwr, x, y, speed))
+        pwr = self.PWR_MAX
+        self.steps = [(self.PWR_OFF, 0,0,True), (pwr, 100,0,True), \
+                (pwr, 100,100,True), (pwr, 0,100,True), (pwr, 0,0,True)]
         laserpen.render_image(self)
 
     def draw_image(self, app, laserpen):

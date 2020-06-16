@@ -2,6 +2,7 @@
 
 from laserimage import *
 import pantilthat
+import RPi.GPIO as GPIO
 import time
 
 #---------------------------------------------------------------
@@ -15,15 +16,26 @@ class LaserPen:
     tilt_max = 2600
     tilt_min = 875
 
+    laser_pin = 18
+    PWR_OFF = 0
+    PWR_MAX = 100
+
     def __init__(self):
         self.incr_offset_x = False 
         self.incr_offset_y = False   # True for pen led side, False for pen ethernet side.
 
         self.curr_x = 0
         self.curr_y = 0
-        self.pwr = True    # Not implemented
+        self.pwr = 0
         self.run = True    # Always True, except when set to False to cancel a
                            #        drawing operation.
+
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.laser_pin, GPIO.OUT)  # activate output
+        self.laser_pwm = GPIO.PWM(self.laser_pin, 100)  # duty cycle: 100Hz
+        self.laser_pwm.start(0)
+
         self._init_pantilt()
 
     def _init_pantilt(self):
@@ -59,22 +71,40 @@ class LaserPen:
         self.curr_y = value 
         time.sleep(DataDict["short_wait"])
 
-    def move(self, pwr, x, y, fast_move=False):  # x,y use image co-ordinate set
-        # pwr not implemented, yet
-        def map(incr_offset, laser_coord, lbound):
-            if incr_offset:
-                return laser_coord + lbound
-            else:
-                return lbound - laser_coord
+    def laser_pwr(self, value):
+        self.laser_pwm.ChangeDutyCycle(value)
 
-        print("move > (" + str(x) + ", " + str(y) + ")")
+    def _map(self, incr_offset, laser_coord, lbound):
+        if incr_offset:
+            return laser_coord + lbound
+        else:
+            return lbound - laser_coord
+
+    def _move(self, x, y):  # x,y use image co-ordinate set
+
+        print(f"move > ({str(x)}, {str(y)})")
         if x > self.image_width or y > self.image_height:
 #           raise ValueError("x,y parms to 'laserpen.move' outside image size.")
             print("laserpen.move: ({}, {}) outside image bounds, ignored.".format(x,y))
 
 #       pos_x, pos_y are in the laserpen co-ordinate system
-        pos_x = map(self.incr_offset_x, int(x/self.image_width  * self.axis_lx), self.lb_x)
-        pos_y = map(self.incr_offset_y, int(y/self.image_height * self.axis_ly), self.lb_y)
+        pos_x = self._map(self.incr_offset_x, int(x/self.image_width  * self.axis_lx), self.lb_x)
+        pos_y = self._map(self.incr_offset_y, int(y/self.image_height * self.axis_ly), self.lb_y)
+
+#       print(x, y, pos_x, pos_y, self.axis_lx, self.axis_ly, self.lb_x, self.lb_y)
+        xy_steps = [(pos_x, pos_y)]
+        self.laser_pwr(self.PWR_OFF)
+        self._pan(pos_x)
+        self._tilt(pos_y)
+
+    def _line(self, pwr, x, y, fast_move=False):  # x,y use image co-ordinate set
+        print(f"move > ({str(x)}, {str(y)})")
+        if x > self.image_width or y > self.image_height:
+            print(f"laserpen.move: ({x}, {y}) outside image bounds, ignored.")
+
+#       pos_x, pos_y are in the laserpen co-ordinate system
+        pos_x = self._map(self.incr_offset_x, int(x/self.image_width  * self.axis_lx), self.lb_x)
+        pos_y = self._map(self.incr_offset_y, int(y/self.image_height * self.axis_ly), self.lb_y)
 
 #       print(x, y, pos_x, pos_y, self.axis_lx, self.axis_ly, self.lb_x, self.lb_y)
         if fast_move:
@@ -94,13 +124,32 @@ class LaserPen:
                 yy = int(r * y_delta / no_of_steps) + self.curr_y
                 xy_steps.append((xx,yy))
 
-#       print(xy_steps)
+        self._draw_steps(xy_steps, pwr)
+
+    def _draw_steps(self, xy_steps, pwr):
+    #   print(xy_steps)
+    #   See if we can move with laser on, or invisibly
+    #   Criteria: if all x coords are equal, or all y co-ords are equal.
+        move_visibly = all(co_ord == xy_steps[0][0] for (co_ord, _) in xy_steps) or \
+                       all(co_ord == xy_steps[0][1] for (_, co_ord) in xy_steps)
+
+        self.laser_pwr(self.PWR_OFF)
         for x,y in xy_steps:
-            if self.run:     # set  to False in lasergui if Cancel button pressed
+            if self.run:     # set to False in lasergui if Cancel button pressed
+                if move_visibly:
+                    self.laser_pwr(pwr)
+                else:
+                    self.laser_pwr(self.PWR_OFF)
                 self._pan(x)
                 self._tilt(y)
+
+                if move_visibly == False:
+                    self.laser_pwr(pwr)
+                    time.sleep(DataDict["short_wait"])
+                    self.laser_pwr(self.PWR_OFF)
             else:
                 break
+        self.laser_pwr(self.PWR_OFF)
 
     def render_image(self, image):
         print("render image")
@@ -109,13 +158,10 @@ class LaserPen:
 
         self.run = True
         for pwr, x, y, speed in image.steps:
-            if self.run:     # set  to False in lasergui if Cancel button pressed
-                self.move(pwr, x, y, fast_move=speed)
+            if self.run:     # set to False in lasergui if Cancel button pressed
+                self._line(pwr, x, y, fast_move=speed)
             else:
                 break
-
-    def _intensity(self, value):    # Not implemented : To be implented by changing "step", or sleep value.
-        pass
 
     def _bounds_error(self, origin_val, range_val, axis, incr_offset):
         lb = origin_val if incr_offset else origin_val - range_val
